@@ -1,20 +1,28 @@
 import sys
 import cv2
 import math
+import random
 import numpy as np
 
-def load_image(path):
-    img = cv2.imread(path, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError(f"Cannot load image: {path}")
+def ensure_3d(img):
+    if img.ndim == 2:
+        return img[:, :, np.newaxis]
     return img
 
+def load_image(path):
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise ValueError(f"Cannot load image: {path}")
+    return ensure_3d(img)
 
 def save_image(path, img):
+    img = ensure_3d(img)
+    if img.shape[2] == 1:
+        img = img[:, :, 0]
     cv2.imwrite(path, img)
 
-
 def brightness(img, value):
+    img = ensure_3d(img)
     h, w, c = img.shape
     result = np.zeros((h, w, c), dtype=np.uint8)
     for y in range(h):
@@ -28,17 +36,11 @@ def brightness(img, value):
                 result[y, x, ch] = new_val
     return result
 
-
 def contrast(img, value):
+    img = ensure_3d(img)
     h, w, c = img.shape
     result = np.zeros((h, w, c), dtype=np.uint8)
-    total = 0
-    count = h * w * c
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                total += int(img[y, x, ch])
-    mean = total / count
+    mean = np.mean(img)
 
     for y in range(h):
         for x in range(w):
@@ -51,38 +53,20 @@ def contrast(img, value):
                 result[y, x, ch] = int(new_val)
     return result
 
-
 def negative(img):
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.uint8)
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                result[y, x, ch] = 255 - img[y, x, ch]
-    return result
-
+    img = ensure_3d(img)
+    return 255 - img
 
 def hflip(img):
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.uint8)
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                result[y, x, ch] = img[y, w - 1 - x, ch]
-    return result
-
+    img = ensure_3d(img)
+    return img[:, ::-1, :]
 
 def vflip(img):
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.uint8)
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                result[y, x, ch] = img[h - 1 - y, x, ch]
-    return result
-
+    img = ensure_3d(img)
+    return img[::-1, :, :]
 
 def dflip(img):
+    img = ensure_3d(img)
     h, w, c = img.shape
     result = np.zeros((w, h, c), dtype=np.uint8)
     for y in range(h):
@@ -92,6 +76,7 @@ def dflip(img):
     return result
 
 def shrink(img, factor):
+    img = ensure_3d(img)
     h, w, c = img.shape
     new_h = int(h / factor)
     new_w = int(w / factor)
@@ -100,29 +85,27 @@ def shrink(img, factor):
         for x in range(new_w):
             src_y = int(y * factor)
             src_x = int(x * factor)
-            for ch in range(c):
-                result[y, x, ch] = img[src_y, src_x, ch]
+            result[y, x] = img[src_y, src_x]
     return result
 
-
 def enlarge(img, factor):
+    img = ensure_3d(img)
     h, w, c = img.shape
     new_h = int(h * factor)
     new_w = int(w * factor)
     result = np.zeros((new_h, new_w, c), dtype=np.uint8)
     for y in range(h):
         for x in range(w):
-            for ch in range(c):
-                for dy in range(factor):
-                    for dx in range(factor):
-                        new_y = y * factor + dy
-                        new_x = x * factor + dx
-                        if new_y < new_h and new_x < new_w:
-                            result[new_y, new_x, ch] = img[y, x, ch]
+            for dy in range(factor):
+                for dx in range(factor):
+                    new_y = y * factor + dy
+                    new_x = x * factor + dx
+                    if new_y < new_h and new_x < new_w:
+                        result[new_y, new_x] = img[y, x]
     return result
 
-
 def median_filter(img, kernel_size):
+    img = ensure_3d(img)
     h, w, c = img.shape
     pad = kernel_size // 2
     padded = np.zeros((h + 2 * pad, w + 2 * pad, c), dtype=np.uint8)
@@ -139,24 +122,24 @@ def median_filter(img, kernel_size):
                 src_x = -src_x
             elif src_x >= w:
                 src_x = 2 * w - src_x - 2
-            for ch in range(c):
-                padded[y, x, ch] = img[src_y, src_x, ch]
+            padded[y, x] = img[src_y, src_x]
 
     result = np.zeros((h, w, c), dtype=np.uint8)
+
     for y in range(h):
         for x in range(w):
             for ch in range(c):
                 window = []
                 for ky in range(-pad, pad + 1):
                     for kx in range(-pad, pad + 1):
-                        window.append(int(padded[y + pad + ky, x + pad + kx, ch]))
+                        window.append(padded[y + pad + ky, x + pad + kx, ch])
                 window.sort()
-                median_val = window[len(window) // 2]
-                result[y, x, ch] = median_val
+                result[y, x, ch] = window[(kernel_size * kernel_size) // 2]
+
     return result
 
-
 def gmean_filter(img, size):
+    img = ensure_3d(img)
     h, w, c = img.shape
     pad = size // 2
     padded = np.zeros((h + 2 * pad, w + 2 * pad, c), dtype=np.uint8)
@@ -173,8 +156,7 @@ def gmean_filter(img, size):
                 src_x = -src_x
             elif src_x >= w:
                 src_x = 2 * w - src_x - 2
-            for ch in range(c):
-                padded[y, x, ch] = img[src_y, src_x, ch]
+            padded[y, x] = img[src_y, src_x]
 
     result = np.zeros((h, w, c), dtype=np.uint8)
     for y in range(h):
@@ -195,9 +177,8 @@ def gmean_filter(img, size):
                 result[y, x, ch] = int(geom)
     return result
 
-
 def add_gaussian_noise(img, sigma):
-    import random
+    img = ensure_3d(img)
     h, w, c = img.shape
     result = np.zeros((h, w, c), dtype=np.uint8)
     for y in range(h):
@@ -212,10 +193,10 @@ def add_gaussian_noise(img, sigma):
                 result[y, x, ch] = int(val)
     return result
 
-
 def add_salt_pepper_noise(img, prob=0.05):
+    img = ensure_3d(img)
     h, w, c = img.shape
-    result = img.copy().astype(np.uint8)
+    result = img.copy()
 
     total_pixels = h * w
     num_salt = int(total_pixels * prob)
@@ -224,281 +205,128 @@ def add_salt_pepper_noise(img, prob=0.05):
     for _ in range(num_salt):
         y = np.random.randint(0, h)
         x = np.random.randint(0, w)
-        for ch in range(c):
-            result[y, x, ch] = 255
+        result[y, x] = 255
 
     for _ in range(num_pepper):
         y = np.random.randint(0, h)
         x = np.random.randint(0, w)
-        for ch in range(c):
-            result[y, x, ch] = 0
+        result[y, x] = 0
 
     return result
-
 
 def mse(img1, img2):
-    h, w, c = img1.shape
-    total = 0
-    count = h * w * c
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                diff = int(img1[y, x, ch]) - int(img2[y, x, ch])
-                total += diff * diff
-    return total / count
-
+    img1 = ensure_3d(img1)
+    img2 = ensure_3d(img2)
+    if img1.shape != img2.shape:
+        raise ValueError("Images must have same size")
+    diff = (img1.astype(int) - img2.astype(int)) ** 2
+    return diff.sum() / diff.size
 
 def pmse(img1, img2):
-    h, w, c = img1.shape
-    total = 0
-    count = h * w * c
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                diff = int(img1[y, x, ch]) - int(img2[y, x, ch])
-                total += diff * diff
-    mse_val = total / count
-    pmse_val = mse_val / (255.0 ** 2)
-    return pmse_val
-
+    return mse(img1, img2) / (255.0 ** 2)
 
 def snr(img1, img2):
-    h, w, c = img1.shape
-    signal_sum = 0
-    noise_sum = 0
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                s = int(img1[y, x, ch])
-                n = int(img1[y, x, ch]) - int(img2[y, x, ch])
-                signal_sum += s * s
-                noise_sum += n * n
-    if noise_sum == 0:
+    img1 = ensure_3d(img1)
+    img2 = ensure_3d(img2)
+    if img1.shape != img2.shape:
+        raise ValueError("Images must have same size")
+    signal = (img1.astype(int) ** 2).sum()
+    noise = ((img1.astype(int) - img2.astype(int)) ** 2).sum()
+    if noise == 0:
         return float('inf')
-    return 10 * np.log10(signal_sum / noise_sum)
-
+    return 10 * math.log10(signal / noise)
 
 def psnr(img1, img2):
-    mse_val = mse(img1, img2)
-    if mse_val == 0:
+    m = mse(img1, img2)
+    if m == 0:
         return float('inf')
-    return 10 * math.log10((255.0 ** 2) / mse_val)
-
+    return 10 * math.log10((255.0 ** 2) / m)
 
 def md(img1, img2):
-    h, w, c = img1.shape
-    max_diff = 0
-    for y in range(h):
-        for x in range(w):
-            for ch in range(c):
-                diff = abs(int(img1[y, x, ch]) - int(img2[y, x, ch]))
-                if diff > max_diff:
-                    max_diff = diff
-    return max_diff
+    img1 = ensure_3d(img1)
+    img2 = ensure_3d(img2)
+    if img1.shape != img2.shape:
+        raise ValueError("Images must have same size")
+    return np.abs(img1.astype(int) - img2.astype(int)).max()
 
+def compute_histogram(img, channel=0):
+    # Compute histogram for specified channel (or grayscale)
+    if img.ndim == 3:
+        data = img[:, :, channel].flatten()
+    else:
+        data = img.flatten()
+    return np.bincount(data, minlength=256).astype(np.float64)
 
-def compute_histogram(img, ch):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    hist = [0] * 256
-    for y in range(h):
-        for x in range(w):
-            v = int(img[y, x, ch])
-            if 0 <= v < 256:
-                hist[v] += 1
-    return hist
+def histogram_rayleigh(img, channel=0, gmin=0, gmax=255, alpha=50.0):
+    # Rayleigh histogram equalization (H3)
+    if img.ndim == 3:
+        img_gray = img[:, :, channel]
+    else:
+        img_gray = img
 
+    hist = compute_histogram(img_gray)
+    N = img_gray.size
+    cdf = np.cumsum(hist) / N  # Cumulative distribution function
 
-def cmean(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    means = []
-    for ch in range(c):
-        total = 0.0
-        for y in range(h):
-            for x in range(w):
-                total += img[y, x, ch]
-        means.append(total / (h * w))
-    return means
+    # Avoid log(0) by clipping CDF
+    cdf = np.clip(cdf, 1e-10, 1.0)
 
+    # Rayleigh transformation: g = sqrt(-2*alpha^2 * ln(1 - CDF))
+    transform = np.sqrt(-2 * (alpha ** 2) * np.log(1 - cdf))
 
-def cvariance(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    vars_ = []
-    means = cmean(img)
-    for ch in range(c):
-        mean = means[ch]
-        total = 0.0
-        for y in range(h):
-            for x in range(w):
-                diff = img[y, x, ch] - mean
-                total += diff * diff
-        vars_.append(total / (h * w))
-    return vars_
+    # Build lookup table
+    lut = np.zeros(256, dtype=np.float32)
+    for f in range(256):
+        lut[f] = gmin + (gmax - gmin) * (transform[f] - transform[0]) / (transform[-1] - transform[0] + 1e-8)
 
+    # Apply LUT
+    enhanced = lut[img_gray]
 
-def cstdev(img):
-    img = img.astype(np.float64)
-    vars_ = cvariance(img)
-    return [math.sqrt(v) for v in vars_]
+    # Clip and convert
+    enhanced = np.clip(enhanced, 0, 255).astype(np.uint8)
 
+    # Replace channel if needed
+    if img.ndim == 3:
+        result = img.copy()
+        result[:, :, channel] = enhanced
+    else:
+        result = enhanced
 
-def cvarcoi(img):
-    img = img.astype(np.float64)
-    means = cmean(img)
-    stdevs = cstdev(img)
-    result = []
-    for m, s in zip(means, stdevs):
-        result.append(s / m if m != 0 else 0)
-    return result
+    return ensure_3d(result)
 
+# --- Image characteristics based on histogram ---
+def image_characteristics(img, channel=0):
+    # Compute all stats from histogram
+    hist = compute_histogram(img, channel)
+    N = img.shape[0] * img.shape[1]
 
-def casyco(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    asym = []
-    means = cmean(img)
-    stdevs = cstdev(img)
-    for ch in range(c):
-        mean = means[ch]
-        std = stdevs[ch]
-        if std == 0:
-            asym.append(0)
-            continue
-        total = 0.0
-        for y in range(h):
-            for x in range(w):
-                total += ((img[y, x, ch] - mean) / std) ** 3
-        asym.append(total / (h * w))
-    return asym
+    # Mean
+    mean = sum(m * hist[m] for m in range(256)) / N
 
+    # Variance
+    variance = sum((m - mean) ** 2 * hist[m] for m in range(256)) / N
 
-def cflatco(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    flat = []
-    means = cmean(img)
-    stdevs = cstdev(img)
-    for ch in range(c):
-        mean = means[ch]
-        std = stdevs[ch]
-        if std == 0:
-            flat.append(0)
-            continue
-        total = 0.0
-        for y in range(h):
-            for x in range(w):
-                total += ((img[y, x, ch] - mean) / std) ** 4
-        flat.append(total / (h * w) - 3)
-    return flat
+    # Standard deviation
+    stdev = math.sqrt(variance)
 
+    # Variation coefficient I
+    varcoi = stdev / mean if mean > 0 else 0.0
 
-def cvarcoii(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    result = []
-    N = h * w
-    for ch in range(c):
-        hist = compute_histogram(img, ch)
-        s = sum(h*h for h in hist)
-        result.append((s) / (N * N))
-    return result
+    # Asymmetry coefficient
+    if stdev > 0:
+        skew = sum((m - mean) ** 3 * hist[m] for m in range(256)) / (N * (stdev ** 3))
+    else:
+        skew = 0.0
 
-
-def centropy(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    entropies = []
-    for ch in range(c):
-        hist = compute_histogram(img, ch)
-        total = h * w
-        e = 0.0
-        for count in hist:
-            if count > 0:
-                p = count / total
-                e -= p * math.log(p, 2)
-        entropies.append(e)
-    return entropies
-
-
-def hrayleigh(img, alpha=50.0):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.uint8)
-    total = h * w
-
-    for ch in range(c):
-        hist = compute_histogram(img, ch)
-        CDF = []
-        s = 0
-        for v in hist:
-            s += v
-            CDF.append(s/total)
-
-        mapping = []
-        for p in CDF:
-            if p >= 1: p = 0.999999
-            val = math.sqrt(-2 * alpha * alpha * math.log(1 - p))
-            mapping.append(min(255, max(0, int(val))))
-
-        for y in range(h):
-            for x in range(w):
-                result[y, x, ch] = mapping[int(img[y, x, ch])]
-
-    return result
-
-
-def slowpass(img):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.float32)
-    kernel = [[1, 2, 1],
-              [2, 4, 2],
-              [1, 2, 1]]
-    ksum = 16.0
-    for ch in range(c):
-        for y in range(h):
-            for x in range(w):
-                s = 0.0
-                for ky in range(-1, 2):
-                    for kx in range(-1, 2):
-                        ny = min(max(y + ky, 0), h - 1)
-                        nx = min(max(x + kx, 0), w - 1)
-                        s += img[ny, nx, ch] * kernel[ky + 1][kx + 1]
-                result[y, x, ch] = s / ksum
-    return result
-
-
-def oll(img, eps=1e-6):
-    img = img.astype(np.float64)
-    h, w, c = img.shape
-    result = np.zeros((h, w, c), dtype=np.float64)
-
-    neighbors = [(-1,-1), (-1,1), (1,-1), (1,1)]
-
-    for ch in range(c):
-        for y in range(h):
-            for x in range(w):
-                center = img[y, x, ch]
-                prod = center**4
-                for dy, dx in neighbors:
-                    ny, nx = y + dy, x + dx
-                    if 0 <= ny < h and 0 <= nx < w:
-                        prod *= img[ny, nx, ch]
-                    else:
-                        prod *= center
-                result[y, x, ch] = 0.25 * abs(np.log(prod + eps))
-    return result
-
+    return mean, variance, stdev, varcoi, skew
 
 def main():
     if len(sys.argv) == 1 or "--help" in sys.argv:
         print("""
-Command-line image processing (manual pixel-by-pixel version)
+Command-line image processing
 
 Usage:
-    python imgproc_manual.py --command -input=in.png -output=out.png [params]
+    python main.py --command -input=in.png -output=out.png [params]
 
 Commands:
     --brightness        -value=40
@@ -518,8 +346,6 @@ Commands:
     --snr   -ref=ref.png
     --psnr  -ref=ref.png
     --md    -ref=ref.png
-    --cmean, --cvariance, --cstdev, --cvarcoi, --casyco, --cflatco, --cvarcoii, --centropy
-    --hrayleigh -alpha=50
 """)
         sys.exit(0)
 
@@ -578,7 +404,6 @@ Commands:
         sigma = float(args.get("sigma", 25))
         result = add_gaussian_noise(img, sigma)
 
-
     elif cmd == "--noise-saltpepper":
         p = float(args.get("p", 0.05))
         result = add_salt_pepper_noise(img, p)
@@ -608,48 +433,27 @@ Commands:
         print("MD:", md(img, ref))
         return
 
-    elif cmd == "--cmean":
-        print("Mean:", cmean(img))
-        return
-
-    elif cmd == "--cvariance":
-        print("Variance:", cvariance(img))
-        return
-
-    elif cmd == "--cstdev":
-        print("StdDev:", cstdev(img))
-        return
-
-    elif cmd == "--cvarcoi":
-        print("VarCoeff I:", cvarcoi(img))
-        return
-
-    elif cmd == "--casyco":
-        print("Asymmetry:", casyco(img))
-        return
-
-    elif cmd == "--cflatco":
-        print("Flattening:", cflatco(img))
-        return
-
-    elif cmd == "--cvarcoii":
-        print("VarCoeff II:", cvarcoii(img))
-        return
-
-    elif cmd == "--centropy":
-        print("Entropy:", centropy(img))
-        return
-
     elif cmd == "--hrayleigh":
-        alpha = float(args.get("alpha", 50))
-        result = hrayleigh(img, alpha)
+        channel = int(args.get("channel", 0))
+        gmin = int(args.get("gmin", 0))
+        gmax = int(args.get("gmax", 255))
+        alpha = float(args.get("alpha", 50.0))
+        result = histogram_rayleigh(img, channel, gmin, gmax, alpha)
 
-    elif cmd == "--slowpass":
-        result = slowpass(img)
-
-    elif cmd == "--oll":
-        eps = float(args.get("eps", 1e-6))
-        result = oll(img, eps)
+    elif cmd in ["--cmean", "--cvariance", "--cstdev", "--cvarcoi", "--casyco"]:
+        channel = int(args.get("channel", 0))
+        mean, variance, stdev, varcoi, skew = image_characteristics(img, channel)
+        if cmd == "--cmean":
+            print(f"Mean: {mean:.4f}")
+        elif cmd == "--cvariance":
+            print(f"Variance: {variance:.4f}")
+        elif cmd == "--cstdev":
+            print(f"Standard deviation: {stdev:.4f}")
+        elif cmd == "--cvarcoi":
+            print(f"Variation coefficient I: {varcoi:.4f}")
+        elif cmd == "--casyco":
+            print(f"Asymmetry coefficient: {skew:.4f}")
+        return  # No image output for characteristics
 
     else:
         print(f"Unknown command: {cmd}")
@@ -660,6 +464,8 @@ Commands:
         print(f"Saved result to {args['output']}")
     else:
         print("No output file specified (-output=...)")
+
+
 
 if __name__ == "__main__":
     main()
