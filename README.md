@@ -1,3 +1,3 @@
-# Image-Processing-Task2
+# Image-Processing-Task3
 
-Image Processing Laboratory Task 2
+Image Processing Laboratory Task 3

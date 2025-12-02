@@ -1,0 +1,11 @@
+python main.py --morph-dilate -input="lenabw.bmp" -output="output/dilate.bmp" -se="cross" -thresh=128
+
+python main.py --morph-erode -input="lenabw.bmp" -output="output/erode.bmp" -se="cross" -thresh=128
+
+python main.py --morph-open -input="lenabw.bmp" -output="output/open.bmp" -se="cross" -thresh=128
+
+python main.py --morph-close -input="lenabw.bmp" -output="output/close.bmp" -se="cross" -thresh=128
+
+python main.py --morph-iter -input="lenabw.bmp" -output="output/hmt.bmp" -se="cross" -thresh=128
+
+python main.py --regiongrow -input="lenabw.bmp" -output="output/rg.bmp" -sy=100 -sx=100 -threshold=10

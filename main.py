@@ -16,6 +16,38 @@ def save_image(path, img):
     cv2.imwrite(path, img)
 
 
+def to_grayscale(img):
+    h, w, c = img.shape
+    gray = np.zeros((h, w), dtype=np.uint8)
+    for y in range(h):
+        for x in range(w):
+            s = 0
+            for ch in range(c):
+                s += int(img[y, x, ch])
+            gray[y, x] = s // c
+    return gray
+
+
+def binarize(img_gray, threshold):
+    h, w = img_gray.shape
+    mask = np.zeros((h, w), dtype=np.uint8)
+    for y in range(h):
+        for x in range(w):
+            mask[y, x] = 1 if int(img_gray[y, x]) >= threshold else 0
+    return mask
+
+
+def mask_to_color(mask):
+    h, w = mask.shape
+    result = np.zeros((h, w, 3), dtype=np.uint8)
+    for y in range(h):
+        for x in range(w):
+            v = 255 if mask[y, x] != 0 else 0
+            for ch in range(3):
+                result[y, x, ch] = v
+    return result
+
+
 def brightness(img, value):
     h, w, c = img.shape
     result = np.zeros((h, w, c), dtype=np.uint8)
@@ -504,9 +536,10 @@ def optimized_slowpass(img):
                 x0, x1, x2 = max(x-1, 0), x, min(x+1, w-1)
 
                 s = (img[y0, x0, ch] + img[y0, x2, ch] +
-                     img[y2, x0, ch] + img[y2, x2, ch]) * 1
+                     img[y2, x0, ch] + img[y2, x2, ch])
                 s += (img[y0, x1, ch] + img[y1, x0, ch] +
-                      img[y1, x2, ch] + img[y2, x1, ch]) * 2
+                      img[y1, x2, ch] + img[y2, x1, ch] + img[y0, x1, ch] + img[y1, x0, ch] +
+                      img[y1, x2, ch] + img[y2, x1, ch])
                 s += img[y1, x1, ch] * 4
 
                 result[y, x, ch] = s / ksum
@@ -517,7 +550,7 @@ def optimized_slowpass(img):
 def oll(img, eps=1e-12):
     img = img.astype(np.float64)
     if img.max() > 1.0:
-        img = img / 255.0  # нормализация в [0,1]
+        img = img / 255.0
 
     h, w, c = img.shape
     result = np.zeros((h, w, c), dtype=np.float64)
@@ -547,6 +580,149 @@ def oll(img, eps=1e-12):
 
     return result
 
+def manual_pad(img, pad_h, pad_w):
+    h, w = img.shape
+    out = np.zeros((h + 2 * pad_h, w + 2 * pad_w), dtype=np.uint8)
+    for i in range(h):
+        for j in range(w):
+            out[i + pad_h, j + pad_w] = img[i, j]
+    return out
+
+
+def dilation(img, se):
+    sh, sw = se.shape
+    ph, pw = sh // 2, sw // 2
+    img_p = manual_pad(img, ph, pw)
+    h, w = img.shape
+    out = np.zeros((h, w), dtype=np.uint8)
+
+    for i in range(h):
+        for j in range(w):
+            value = 0
+            for y in range(sh):
+                for x in range(sw):
+                    if se[y, x] == 1 and img_p[i + y, j + x] == 1:
+                        value = 1
+                        break
+                if value == 1:
+                    break
+            out[i, j] = value
+    return out
+
+
+def erosion(img, se):
+    sh, sw = se.shape
+    ph, pw = sh // 2, sw // 2
+    img_p = manual_pad(img, ph, pw)
+    h, w = img.shape
+    out = np.zeros((h, w), dtype=np.uint8)
+
+    for i in range(h):
+        for j in range(w):
+            value = 1
+            for y in range(sh):
+                for x in range(sw):
+                    if se[y, x] == 1 and img_p[i + y, j + x] == 0:
+                        value = 0
+                        break
+                if value == 0:
+                    break
+            out[i, j] = value
+    return out
+
+
+def opening(img, se):
+    return dilation(erosion(img, se), se)
+
+
+def closing(img, se):
+    return erosion(dilation(img, se), se)
+
+
+def hit_or_miss(img, se_fore, se_back):
+    img_inv = np.zeros_like(img)
+    h, w = img.shape
+    for i in range(h):
+        for j in range(w):
+            img_inv[i, j] = 1 - img[i, j]
+
+    er_f = erosion(img, se_fore)
+    er_b = erosion(img_inv, se_back)
+
+    out = np.zeros_like(img)
+    for i in range(h):
+        for j in range(w):
+            out[i, j] = 1 if (er_f[i, j] == 1 and er_b[i, j] == 1) else 0
+    return out
+
+
+def iterative_process(A, B_pair):
+    if not (isinstance(B_pair, (list, tuple)) and len(B_pair) == 2):
+        raise ValueError("B_pair must be a (B1, B2) tuple for hit-or-miss.")
+
+    B1, B2 = B_pair
+    X_prev = A.copy().astype(np.uint8)
+
+    while True:
+        hm = hit_or_miss(X_prev, B1, B2)
+        X_new = np.logical_or(hm == 1, X_prev == 1).astype(np.uint8)
+        if np.array_equal(X_new, X_prev):
+            return X_new
+        X_prev = X_new
+
+SE_cross = np.array([[0,1,0],
+                     [1,1,1],
+                     [0,1,0]], dtype=np.uint8)
+
+SE_square = np.ones((3,3), dtype=np.uint8)
+
+SE_line = np.array([
+    [1, 1, 1]
+], dtype=np.uint8)
+
+B1 = np.array([[0,1,0],
+               [1,1,1],
+               [0,1,0]], dtype=np.uint8)
+
+B2 = np.array([[1,0,1],
+               [0,0,0],
+               [1,0,1]], dtype=np.uint8)
+
+
+B_pairs = [
+    (B1, B2),
+    (SE_square, np.zeros((3,3), dtype=np.uint8)),
+    (SE_cross, np.zeros((3,3), dtype=np.uint8)),
+    (np.array([[1,1,1]], dtype=np.uint8), np.zeros((1,3), dtype=np.uint8))
+]
+
+def region_growing(img, seeds, threshold):
+    h, w = img.shape
+    segmented = np.zeros((h, w), dtype=np.uint8)
+
+    stack = []
+    for (sy, sx) in seeds:
+        if 0 <= sy < h and 0 <= sx < w:
+            if segmented[sy, sx] == 0:
+                segmented[sy, sx] = 1
+                seed_val = int(img[sy, sx])
+                stack.append((sy, sx, seed_val))
+
+    while stack:
+        y, x, seed_val = stack.pop()
+
+        neighbours = [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]
+        for ny, nx in neighbours:
+            if 0 <= ny < h and 0 <= nx < w:
+                if segmented[ny, nx] == 0:
+                    diff = abs(int(img[ny, nx]) - seed_val)
+                    if diff <= threshold:
+                        segmented[ny, nx] = 1
+                        stack.append((ny, nx, seed_val))
+                        stack.append((ny, nx, seed_val))
+
+    return segmented
+
 
 def main():
     if len(sys.argv) == 1 or "--help" in sys.argv:
@@ -575,7 +751,19 @@ Commands:
     --psnr  -ref=ref.png
     --md    -ref=ref.png
     --cmean, --cvariance, --cstdev, --cvarcoi, --casyco, --cflatco, --cvarcoii, --centropy
-    --hrayleigh -alpha=50
+    --hrayleigh     -alpha=50
+    --slowpass
+    --oll           -eps=1e-6
+
+    Morphology (on internally binarized grayscale image, output 0/255 mask):
+    --morph-dilate  -se=cross|square|line -thresh=128
+    --morph-erode   -se=cross|square|line -thresh=128
+    --morph-open    -se=cross|square|line -thresh=128
+    --morph-close   -se=cross|square|line -thresh=128
+    --morph-iter    -se=cross|square|line -thresh=128
+
+    Region growing (manual segmentation on grayscale):
+    --regiongrow    -sy=0 -sx=0 -threshold=10
 """)
         sys.exit(0)
 
@@ -704,19 +892,51 @@ Commands:
 
     elif cmd == "--hrayleigh":
 
-        alpha = float(args.get("alpha", 50))
+        alpha = float(args.get("alpha", 10))
         result = hrayleigh(img, alpha)
 
     elif cmd == "--slowpass":
-        result = universal_convolution(img, [
-    [-1, 0, 1],
-    [-2, 0, 2],
-    [-1, 0, 1]
-])
+        result = optimized_slowpass(img)
 
     elif cmd == "--oll":
         eps = float(args.get("eps", 1e-6))
         result = oll(img, eps)
+
+    elif cmd in ("--morph-dilate", "--morph-erode", "--morph-open", "--morph-close", "--morph-iter"):
+        se_name = args.get("se", "cross")
+        thresh = int(args.get("thresh", 128))
+
+        gray = to_grayscale(img)
+        bin_img = binarize(gray, thresh)
+
+        if se_name == "square":
+            B = SE_square
+        elif se_name == "line":
+            B = SE_line
+        else:
+            B = SE_cross
+
+        if cmd == "--morph-dilate":
+            mask = dilation(bin_img, B)
+        elif cmd == "--morph-erode":
+            mask = erosion(bin_img, B)
+        elif cmd == "--morph-open":
+            mask = opening(bin_img, B)
+        elif cmd == "--morph-close":
+            mask = closing(bin_img, B)
+        else:
+            mask = iterative_process(bin_img, (B1, B2))
+
+        result = mask_to_color(mask)
+
+    elif cmd == "--regiongrow":
+        sy = int(args.get("sy", 0))
+        sx = int(args.get("sx", 0))
+        threshold = int(args.get("threshold", 10))
+
+        gray = to_grayscale(img)
+        seg_mask = region_growing(gray, [(sy, sx)], threshold)
+        result = mask_to_color(seg_mask)
 
     else:
         print(f"Unknown command: {cmd}")
