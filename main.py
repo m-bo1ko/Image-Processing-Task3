@@ -639,24 +639,30 @@ def closing(img, se):
     return erosion(dilation(img, se), se)
 
 
-def hit_or_miss(img, se_fore, se_back):
-    img_inv = np.zeros_like(img)
+def hit_or_miss(image, se_present, se_absent):
+    img = image.astype(np.int32)
+    img_inv = np.zeros(img.shape, dtype=np.uint32)
     h, w = img.shape
-    for i in range(h):
-        for j in range(w):
-            img_inv[i, j] = 1 - img[i, j]
 
-    er_f = erosion(img, se_fore)
-    er_b = erosion(img_inv, se_back)
+    output = np.zeros(img.shape, dtype=np.uint32)
 
-    out = np.zeros_like(img)
-    for i in range(h):
-        for j in range(w):
-            out[i, j] = 1 if (er_f[i, j] == 1 and er_b[i, j] == 1) else 0
-    return out
+    for y in range(h):
+        for x in range(w):
+            img_inv[y][x] = 1 - img[y][x]
 
+    eroded_img = erosion(img, se_present)
+    eroded_inv = erosion(img_inv, se_absent)
 
-def iterative_process(A, B_pair):
+    for y in range(h):
+        for x in range(w):
+            if eroded_img[y][x] == 0 or eroded_inv[y][x] == 0:
+                output[y][x] = 0
+            else:
+                output[y][x] = 1
+
+    return output.astype(np.uint8)
+
+def M4(A, B_pair):
     if not (isinstance(B_pair, (list, tuple)) and len(B_pair) == 2):
         raise ValueError("B_pair must be a (B1, B2) tuple for hit-or-miss.")
 
@@ -680,13 +686,17 @@ SE_line = np.array([
     [1, 1, 1]
 ], dtype=np.uint8)
 
-B1 = np.array([[0,1,0],
-               [1,1,1],
-               [0,1,0]], dtype=np.uint8)
+B1 = np.array([
+    [0,1,0],
+    [1,1,1],
+    [0,1,0]
+], dtype=np.uint8)
 
-B2 = np.array([[1,0,1],
-               [0,0,0],
-               [1,0,1]], dtype=np.uint8)
+B2 = np.array([
+    [0,0,0],
+    [0,0,0],
+    [0,0,0]
+], dtype=np.uint8)
 
 
 B_pairs = [
@@ -696,33 +706,135 @@ B_pairs = [
     (np.array([[1,1,1]], dtype=np.uint8), np.zeros((1,3), dtype=np.uint8))
 ]
 
-def region_growing(img, seeds, threshold):
+
+def region_growing(image, seeds, threshold):
+
+    img = image.astype(np.float32)
     h, w = img.shape
-    segmented = np.zeros((h, w), dtype=np.uint8)
+    threshold = float(threshold)
 
-    stack = []
-    for (sy, sx) in seeds:
-        if 0 <= sy < h and 0 <= sx < w:
-            if segmented[sy, sx] == 0:
-                segmented[sy, sx] = 1
-                seed_val = int(img[sy, sx])
-                stack.append((sy, sx, seed_val))
+    labels = np.zeros_like(image, dtype=np.int32)
+    current_label = 1
 
-    while stack:
-        y, x, seed_val = stack.pop()
+    region_mean = {}
+    region_size = {}
 
-        neighbours = [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)]
-        for ny, nx in neighbours:
-            if 0 <= ny < h and 0 <= nx < w:
-                if segmented[ny, nx] == 0:
-                    diff = abs(int(img[ny, nx]) - seed_val)
-                    if diff <= threshold:
-                        segmented[ny, nx] = 1
-                        stack.append((ny, nx, seed_val))
-                        stack.append((ny, nx, seed_val))
+    if seeds == "automatic":
+        seeds = [(x, y) for x in range(h) for y in range(w)]
+    elif seeds == "manual":
+        seeds = [(0, 0), (5, 5)]
+    else:
+        seeds = [(x, y) for x, y in seeds if 0 <= x < h and 0 <= y < w]
 
-    return segmented
+    for seed_x, seed_y in seeds:
 
+        if labels[seed_x, seed_y] != 0:
+            continue
+
+        queue = [(seed_x, seed_y)]
+        labels[seed_x, seed_y] = current_label
+
+        collected = [img[seed_x, seed_y]]
+
+        while queue:
+            x, y = queue.pop(0)
+
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+
+                    if dx == 0 and dy == 0:
+                        continue
+
+                    nx, ny = x + dx, y + dy
+                    if not (0 <= nx < h and 0 <= ny < w):
+                        continue
+
+                    if labels[nx, ny] != 0:
+                        continue
+
+                    if abs(img[nx, ny] - img[x, y]) <= threshold:
+                        labels[nx, ny] = current_label
+                        queue.append((nx, ny))
+                        collected.append(img[nx, ny])
+
+        region_mean[current_label] = float(np.mean(collected))
+        region_size[current_label] = len(collected)
+        current_label += 1
+
+
+    borders = np.zeros_like(labels, dtype=bool)
+
+    for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+        shifted = np.roll(labels, (dx, dy), axis=(0, 1))
+        borders |= (labels != shifted)
+
+    border_coords = np.argwhere(borders)
+
+    adjacent = set()
+
+    for x, y in border_coords:
+        for nx, ny in [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]:
+            if 0 <= nx < h and 0 <= ny < w:
+                a = labels[x, y]
+                b = labels[nx, ny]
+                if a != 0 and b != 0 and a != b:
+                    adjacent.add(tuple(sorted((a, b))))
+
+    parent = {lab: lab for lab in np.unique(labels) if lab > 0}
+
+    for a, b in adjacent:
+
+        pa = parent[a]
+        pb = parent[b]
+
+        if pa == pb:
+            continue
+
+        similar = abs(region_mean[pa] - region_mean[pb]) <= threshold
+
+        if similar:
+            low = min(pa, pb)
+            high = max(pa, pb)
+            for k in parent:
+                if parent[k] == high:
+                    parent[k] = low
+
+    for old, new in parent.items():
+        while parent[new] != new:
+            new = parent[new]
+        labels[labels == old] = new
+
+    return labels
+
+SE_cross = np.array([[0,1,0],
+                     [1,1,1],
+                     [0,1,0]], dtype=np.uint8)
+
+SE_square = np.ones((3,3), dtype=np.uint8)
+
+SE_line = np.array([
+    [1, 1, 1]
+], dtype=np.uint8)
+
+B1 = np.array([
+    [0,1,0],
+    [1,1,1],
+    [0,1,0]
+], dtype=np.uint8)
+
+B2 = np.array([
+    [0,0,0],
+    [0,0,0],
+    [0,0,0]
+], dtype=np.uint8)
+
+
+B_pairs = [
+    (B1, B2),
+    (SE_square, np.zeros((3,3), dtype=np.uint8)),
+    (SE_cross, np.zeros((3,3), dtype=np.uint8)),
+    (np.array([[1,1,1]], dtype=np.uint8), np.zeros((1,3), dtype=np.uint8))
+]
 
 def main():
     if len(sys.argv) == 1 or "--help" in sys.argv:
@@ -760,7 +872,7 @@ Commands:
     --morph-erode   -se=cross|square|line -thresh=128
     --morph-open    -se=cross|square|line -thresh=128
     --morph-close   -se=cross|square|line -thresh=128
-    --morph-iter    -se=cross|square|line -thresh=128
+    --morph-m4    -se=cross|square|line -thresh=128
 
     Region growing (manual segmentation on grayscale):
     --regiongrow    -sy=0 -sx=0 -threshold=10
@@ -902,7 +1014,7 @@ Commands:
         eps = float(args.get("eps", 1e-6))
         result = oll(img, eps)
 
-    elif cmd in ("--morph-dilate", "--morph-erode", "--morph-open", "--morph-close", "--morph-iter"):
+    elif cmd in ("--morph-dilate", "--morph-erode", "--morph-open", "--morph-close", "--morph-m4"):
         se_name = args.get("se", "cross")
         thresh = int(args.get("thresh", 128))
 
@@ -925,7 +1037,7 @@ Commands:
         elif cmd == "--morph-close":
             mask = closing(bin_img, B)
         else:
-            mask = iterative_process(bin_img, (B1, B2))
+            mask = M4(bin_img, (B1, B2))
 
         result = mask_to_color(mask)
 

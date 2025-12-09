@@ -5,52 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="eceffe98-8e2c-4ad1-ae55-05d0ff488cfe" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/copilot.data.migration.agent.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/copilot.data.migration.ask.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/copilot.data.migration.edit.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/task 3.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/commands.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Task 2.iml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_impulse2_small.bmp.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_impulse2_small.bmp_hrayleigh.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_normal2_small.bmp.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_normal2_small.bmp_hrayleigh.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_small.bmp.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_small.bmp_hrayleigh.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_uniform2_small.bmp.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hist/hist_lena_uniform2_small.bmp_hrayleigh.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hrayleigh/lena_impulse2_small.bmp_hrayleigh.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hrayleigh/lena_normal2_small.bmp_hrayleigh.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hrayleigh/lena_small.bmp_hrayleigh.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/hrayleigh/lena_uniform2_small.bmp_hrayleigh.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lena_impulse2_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lena_normal2_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lena_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lena_uniform2_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lenac_impulse2_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lenac_normal2_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lenac_small.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/lenac_uniform2_small.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/commands.txt" beforeDir="false" afterPath="$PROJECT_DIR$/commands.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/oll/lena_impulse2_small.bmp_oll.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/oll/lena_normal2_small.bmp_oll.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/oll/lena_small.bmp_oll.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/oll/lena_uniform2_small.bmp_oll.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/run1_lab.ps1" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/run_lab.ps1" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/optimized/lena_impulse2_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/optimized/lena_normal2_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/optimized/lena_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/optimized/lena_uniform2_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/universal/lena_impulse2_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/universal/lena_normal2_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/universal/lena_small.bmp_slowpass.bmp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/slowpass/universal/lena_uniform2_small.bmp_slowpass.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/close.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/dilate.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/erode.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/hmt.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/open.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/output/rg.bmp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/test_morph_and_region.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -60,21 +24,21 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "m-bo1ko"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;m-bo1ko&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/m-bo1ko/Image-Processing-Task2.git",
-    "accountId": "057301b2-4282-4757-9085-088516706a23"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/m-bo1ko/Image-Processing-Task3.git&quot;,
+    &quot;accountId&quot;: &quot;057301b2-4282-4757-9085-088516706a23&quot;
   }
-}]]></component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 4
-}]]></component>
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
   <component name="ProjectId" id="36IbaU9XZl9YeSj7ZlIgok2o80C" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -87,8 +51,9 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "misha-branch",
-    "last_opened_file_path": "D:/ДЗ/4 курс/TUL/ImgProc/task 3"
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "D:/ДЗ/4 курс/TUL/ImgProc/task 3",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
 }]]></component>
   <component name="SharedIndexes">
@@ -107,6 +72,22 @@
       <updated>1764697101097</updated>
     </task>
     <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="5597614d-ca90-4ee0-b4ce-55cffde9ffba" value="TOOL_WINDOW" />
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="5597614d-ca90-4ee0-b4ce-55cffde9ffba">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

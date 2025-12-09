@@ -6,6 +6,6 @@ python main.py --morph-open -input="lenabw.bmp" -output="output/open.bmp" -se="c
 
 python main.py --morph-close -input="lenabw.bmp" -output="output/close.bmp" -se="cross" -thresh=128
 
-python main.py --morph-iter -input="lenabw.bmp" -output="output/hmt.bmp" -se="cross" -thresh=128
+python main.py --morph-m4 -input="lenabw.bmp" -output="output/hmt.bmp" -se="cross" -thresh=128
 
 python main.py --regiongrow -input="lenabw.bmp" -output="output/rg.bmp" -sy=100 -sx=100 -threshold=10
