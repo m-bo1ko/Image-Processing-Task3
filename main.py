@@ -3,6 +3,7 @@ import cv2
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import label
 
 
 def load_image(path):
@@ -450,7 +451,7 @@ def cvarcoii(img):
     N = h * w
     for ch in range(c):
         hist = compute_histogram(img, ch)
-        s = sum(h*h for h in hist)
+        s = sum(h * h for h in hist)
         result.append((s) / (N * N))
     return result
 
@@ -483,7 +484,7 @@ def hrayleigh(img, alpha):
         s = 0
         for v in hist:
             s += v
-            CDF.append(s/total)
+            CDF.append(s / total)
 
         mapping = []
         for p in CDF:
@@ -532,8 +533,8 @@ def optimized_slowpass(img):
     for ch in range(c):
         for y in range(h):
             for x in range(w):
-                y0, y1, y2 = max(y-1, 0), y, min(y+1, h-1)
-                x0, x1, x2 = max(x-1, 0), x, min(x+1, w-1)
+                y0, y1, y2 = max(y - 1, 0), y, min(y + 1, h - 1)
+                x0, x1, x2 = max(x - 1, 0), x, min(x + 1, w - 1)
 
                 s = (img[y0, x0, ch] + img[y0, x2, ch] +
                      img[y2, x0, ch] + img[y2, x2, ch])
@@ -569,7 +570,7 @@ def oll(img, eps=1e-12):
                     else:
                         prod *= center
 
-                val = center**4 / (prod + eps)
+                val = center ** 4 / (prod + eps)
 
                 result[y, x, ch] = 0.25 * abs(np.log(val + eps))
 
@@ -580,12 +581,11 @@ def oll(img, eps=1e-12):
 
     return result
 
+
 def manual_pad(img, pad_h, pad_w):
     h, w = img.shape
     out = np.zeros((h + 2 * pad_h, w + 2 * pad_w), dtype=np.uint8)
-    for i in range(h):
-        for j in range(w):
-            out[i + pad_h, j + pad_w] = img[i, j]
+    out[pad_h:pad_h + h, pad_w:pad_w + w] = img
     return out
 
 
@@ -598,15 +598,9 @@ def dilation(img, se):
 
     for i in range(h):
         for j in range(w):
-            value = 0
-            for y in range(sh):
-                for x in range(sw):
-                    if se[y, x] == 1 and img_p[i + y, j + x] == 1:
-                        value = 1
-                        break
-                if value == 1:
-                    break
-            out[i, j] = value
+            region = img_p[i:i + sh, j:j + sw]
+            if np.any(np.logical_and(region, se)):
+                out[i, j] = 1
     return out
 
 
@@ -619,15 +613,9 @@ def erosion(img, se):
 
     for i in range(h):
         for j in range(w):
-            value = 1
-            for y in range(sh):
-                for x in range(sw):
-                    if se[y, x] == 1 and img_p[i + y, j + x] == 0:
-                        value = 0
-                        break
-                if value == 0:
-                    break
-            out[i, j] = value
+            region = img_p[i:i + sh, j:j + sw]
+            if np.all(np.logical_or(np.logical_not(se), region)):
+                out[i, j] = 1
     return out
 
 
@@ -640,75 +628,37 @@ def closing(img, se):
 
 
 def hit_or_miss(image, se_present, se_absent):
-    img = image.astype(np.int32)
-    img_inv = np.zeros(img.shape, dtype=np.uint32)
-    h, w = img.shape
+    eroded_img = erosion(image, se_present)
+    eroded_inv = erosion(1 - image, se_absent)
+    return np.logical_and(eroded_img, eroded_inv).astype(np.uint8)
 
-    output = np.zeros(img.shape, dtype=np.uint32)
 
-    for y in range(h):
-        for x in range(w):
-            img_inv[y][x] = 1 - img[y][x]
-
-    eroded_img = erosion(img, se_present)
-    eroded_inv = erosion(img_inv, se_absent)
-
-    for y in range(h):
-        for x in range(w):
-            if eroded_img[y][x] == 0 or eroded_inv[y][x] == 0:
-                output[y][x] = 0
-            else:
-                output[y][x] = 1
-
-    return output.astype(np.uint8)
-
-def M4(A, B_pair):
-    if not (isinstance(B_pair, (list, tuple)) and len(B_pair) == 2):
-        raise ValueError("B_pair must be a (B1, B2) tuple for hit-or-miss.")
-
-    B1, B2 = B_pair
+def M4(A):
     X_prev = A.copy().astype(np.uint8)
+    B1 = np.ones((3, 3), dtype=np.uint8)
 
     while True:
-        hm = hit_or_miss(X_prev, B1, B2)
-        X_new = np.logical_or(hm == 1, X_prev == 1).astype(np.uint8)
+        internal_pixels = erosion(X_prev, B1)
+
+        X_new = np.logical_and(X_prev, np.logical_not(internal_pixels)).astype(np.uint8)
+
         if np.array_equal(X_new, X_prev):
             return X_new
         X_prev = X_new
 
-SE_cross = np.array([[0,1,0],
-                     [1,1,1],
-                     [0,1,0]], dtype=np.uint8)
 
-SE_square = np.ones((3,3), dtype=np.uint8)
+SE_cross = np.array([[0, 1, 0],
+                     [1, 1, 1],
+                     [0, 1, 0]], dtype=np.uint8)
+
+SE_square = np.ones((3, 3), dtype=np.uint8)
 
 SE_line = np.array([
     [1, 1, 1]
 ], dtype=np.uint8)
 
-B1 = np.array([
-    [0,1,0],
-    [1,1,1],
-    [0,1,0]
-], dtype=np.uint8)
-
-B2 = np.array([
-    [0,0,0],
-    [0,0,0],
-    [0,0,0]
-], dtype=np.uint8)
-
-
-B_pairs = [
-    (B1, B2),
-    (SE_square, np.zeros((3,3), dtype=np.uint8)),
-    (SE_cross, np.zeros((3,3), dtype=np.uint8)),
-    (np.array([[1,1,1]], dtype=np.uint8), np.zeros((1,3), dtype=np.uint8))
-]
-
 
 def region_growing(image, seeds, threshold):
-
     img = image.astype(np.float32)
     h, w = img.shape
     threshold = float(threshold)
@@ -761,7 +711,6 @@ def region_growing(image, seeds, threshold):
         region_size[current_label] = len(collected)
         current_label += 1
 
-
     borders = np.zeros_like(labels, dtype=bool)
 
     for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
@@ -773,7 +722,7 @@ def region_growing(image, seeds, threshold):
     adjacent = set()
 
     for x, y in border_coords:
-        for nx, ny in [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]:
+        for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
             if 0 <= nx < h and 0 <= ny < w:
                 a = labels[x, y]
                 b = labels[nx, ny]
@@ -806,35 +755,6 @@ def region_growing(image, seeds, threshold):
 
     return labels
 
-SE_cross = np.array([[0,1,0],
-                     [1,1,1],
-                     [0,1,0]], dtype=np.uint8)
-
-SE_square = np.ones((3,3), dtype=np.uint8)
-
-SE_line = np.array([
-    [1, 1, 1]
-], dtype=np.uint8)
-
-B1 = np.array([
-    [0,1,0],
-    [1,1,1],
-    [0,1,0]
-], dtype=np.uint8)
-
-B2 = np.array([
-    [0,0,0],
-    [0,0,0],
-    [0,0,0]
-], dtype=np.uint8)
-
-
-B_pairs = [
-    (B1, B2),
-    (SE_square, np.zeros((3,3), dtype=np.uint8)),
-    (SE_cross, np.zeros((3,3), dtype=np.uint8)),
-    (np.array([[1,1,1]], dtype=np.uint8), np.zeros((1,3), dtype=np.uint8))
-]
 
 def main():
     if len(sys.argv) == 1 or "--help" in sys.argv:
@@ -1037,7 +957,7 @@ Commands:
         elif cmd == "--morph-close":
             mask = closing(bin_img, B)
         else:
-            mask = M4(bin_img, (B1, B2))
+            mask = M4(bin_img)
 
         result = mask_to_color(mask)
 
@@ -1059,6 +979,7 @@ Commands:
         print(f"Saved result to {args['output']}")
     else:
         print("No output file specified (-output=...)")
+
 
 if __name__ == "__main__":
     main()
