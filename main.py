@@ -633,18 +633,102 @@ def hit_or_miss(image, se_present, se_absent):
     return np.logical_and(eroded_img, eroded_inv).astype(np.uint8)
 
 
-def M4(A):
-    X_prev = A.copy().astype(np.uint8)
-    B1 = np.ones((3, 3), dtype=np.uint8)
+# def M4(A):
+#     X_prev = A.copy().astype(np.uint8)
+#     B1 = np.ones((3, 3), dtype=np.uint8)
+#
+#     while True:
+#         internal_pixels = erosion(X_prev, B1)
+#
+#         X_new = np.logical_and(X_prev, np.logical_not(internal_pixels)).astype(np.uint8)
+#
+#         if np.array_equal(X_new, X_prev):
+#             return X_new
+#         X_prev = X_new
 
-    while True:
-        internal_pixels = erosion(X_prev, B1)
 
-        X_new = np.logical_and(X_prev, np.logical_not(internal_pixels)).astype(np.uint8)
+def M4(bin_img, template=None, thresh=0.9, allow_missing=0):
+    A = (bin_img != 0).astype(np.uint8)
+    if template is None:
+        template = np.array([[1,0,0],
+                             [1,0,0],
+                             [1,1,1]], dtype=np.uint8)
+    T = (template != 0).astype(np.uint8)
+    t_sum = int(T.sum())
+    if t_sum == 0:
+        return np.zeros_like(A, dtype=np.uint8)
 
-        if np.array_equal(X_new, X_prev):
-            return X_new
-        X_prev = X_new
+    # Try OpenCV
+    try:
+        import cv2
+        # matchTemplate expects 8-bit single-channel image; result is float map of correlation
+        res = cv2.matchTemplate(A.astype(np.uint8), T.astype(np.uint8), cv2.TM_CCORR_NORMED)
+        # res shape is (H-tH+1, W-tW+1). threshold on res
+        hits = (res >= thresh).astype(np.uint8)
+        mask = np.zeros_like(A, dtype=np.uint8)
+        th, tw = T.shape
+        # place hits at top-left of each match; if you prefer center, adjust indices
+        ys, xs = np.nonzero(hits)
+        for y, x in zip(ys, xs):
+            mask[y:y+th, x:x+tw] |= 1  # mark area of match (or set center only)
+        return mask
+
+    except Exception:
+        pass
+
+    # Try scipy.signal.convolve2d
+    try:
+        from scipy.signal import convolve2d
+        conv = convolve2d(A, T[::-1, ::-1], mode='valid')  # sum of overlapping ones
+        # allow_missing: conv >= t_sum - allow_missing
+        if allow_missing <= 0:
+            # use relative threshold if thresh in (0,1)
+            if 0 < thresh <= 1:
+                min_required = int(np.ceil(t_sum * thresh))
+            else:
+                min_required = t_sum
+        else:
+            min_required = max(0, t_sum - int(allow_missing))
+
+        hits = (conv >= min_required)
+        mask = np.zeros_like(A, dtype=np.uint8)
+        th, tw = T.shape
+        ys, xs = np.nonzero(hits)
+        for y, x in zip(ys, xs):
+            mask[y:y+th, x:x+tw] |= 1
+        return mask
+
+    except Exception:
+        pass
+
+    # Fallback: numpy sliding window (works but медленнее)
+    # Create view of all patches using as_strided
+    H, W = A.shape
+    th, tw = T.shape
+    if H < th or W < tw:
+        return np.zeros_like(A, dtype=np.uint8)
+
+    shape = (H - th + 1, W - tw + 1, th, tw)
+    strides = (A.strides[0], A.strides[1], A.strides[0], A.strides[1])
+    from numpy.lib.stride_tricks import as_strided
+    patches = as_strided(A, shape=shape, strides=strides)
+    # compute sum of patch * template for each patch
+    # patches is view shape (ny, nx, th, tw)
+    prod = (patches * T).sum(axis=(2,3))
+    if allow_missing <= 0:
+        if 0 < thresh <= 1:
+            min_required = int(np.ceil(t_sum * thresh))
+        else:
+            min_required = t_sum
+    else:
+        min_required = max(0, t_sum - int(allow_missing))
+
+    hits = (prod >= min_required)
+    mask = np.zeros_like(A, dtype=np.uint8)
+    ys, xs = np.nonzero(hits)
+    for y, x in zip(ys, xs):
+        mask[y:y+th, x:x+tw] |= 1
+    return mask
 
 
 SE_cross = np.array([[0, 1, 0],
@@ -957,7 +1041,11 @@ Commands:
         elif cmd == "--morph-close":
             mask = closing(bin_img, B)
         else:
-            mask = M4(bin_img)
+            template_L = np.array([[1, 1, 0],
+                                   [0, 1, 0],
+                                   [0, 1, 0]], dtype=np.uint8)
+
+            mask = M4(bin_img, template=template_L, thresh=0.9, allow_missing=1)
 
         result = mask_to_color(mask)
 
